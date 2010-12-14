@@ -46,22 +46,22 @@ class LinearizeRequirementsTests(TestCase):
         ]
         for fixture in fixtures:
             self.available_fixtures[("tests", fixture)] = globals()[fixture]
-    
+
     def linearize_requirements(self, test_func):
         return linearize_requirements(self.available_fixtures, test_func)
-    
+
     def test_basic(self):
         requirements, models = self.linearize_requirements(test_func_1)
         self.assertEqual(requirements, [test_func_1])
         self.assertEqual(models, set())
-    
+
     def test_diamond(self):
         requirements, models = self.linearize_requirements(test_func_2)
         self.assertEqual(
             requirements,
             [test_func_5, test_func_3, test_func_4, test_func_2]
         )
-    
+
     def test_circular(self):
         self.assertRaises(CircularDependencyError,
             linearize_requirements, self.available_fixtures, test_func_6
@@ -69,23 +69,27 @@ class LinearizeRequirementsTests(TestCase):
 
 
 class ManagementCommandTests(TestCase):
-    def generate_fixture(self, fixture):
+    def generate_fixture(self, fixture, **options):
         out = sys.stdout
         sys.stdout = StringIO()
         try:
-            call_command("generate_fixture", fixture)
+            call_command("generate_fixture", fixture, **options)
             output = sys.stdout.getvalue()
         finally:
             sys.stdout = out
         return output
-    
+
     def test_basic(self):
         output = self.generate_fixture("tests.test_1")
-        self.assertEqual(output, """[{"pk": 1, "model": "tests.author", "fields": {"name": "Tom Clancy"}}, {"pk": 2, "model": "tests.author", "fields": {"name": "Daniel Pinkwater"}}]\n""")
-    
+        self.assertEqual(output, """[{"pk": 1, "model": "tests.author", "fields": {"name": "Tom Clancy"}}, {"pk": 2, "model": "tests.author", "fields": {"name": "Daniel Pinkwater"}}]""")
+
     def test_auth(self):
         # All that we're checking for is that it doesn't hang on this call,
         # which would happen if the auth post syncdb hook goes and prompts the
         # user to create an account.
         output = self.generate_fixture("tests.test_2")
-        self.assertEqual(output, "[]\n")
+        self.assertEqual(output, "[]")
+
+    def test_natural_keys(self):
+        output = self.generate_fixture("tests.test_3", use_natural_keys=True)
+        self.assertEqual(output, """[{"pk": 1, "model": "tests.book", "fields": {"author": ["Issac Asimov"], "title": "Foundation"}}]""")
