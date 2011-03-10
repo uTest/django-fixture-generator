@@ -16,10 +16,17 @@ class CircularDependencyError(Exception):
     """
     pass
 
+def unique_seq(l):
+    seen = set()
+    for e in l:
+        if e not in seen:
+            seen.add(e)
+            yield e
+
 def linearize_requirements(available_fixtures, fixture, seen=None):
     if seen is None:
         seen = set([fixture])
-    models = set(fixture.models)
+    models = list(reversed(fixture.models))
     requirements = []
     for requirement in fixture.requires:
         app_label, fixture_name = requirement.rsplit(".", 1)
@@ -32,9 +39,9 @@ def linearize_requirements(available_fixtures, fixture, seen=None):
             seen | set([fixture_func])
         )
         requirements.extend([req for req in r if req not in requirements])
-        models.update(m)
+        models.extend(reversed(m))
     requirements.append(fixture)
-    return requirements, models
+    return requirements, list(unique_seq(reversed(models)))
 
 
 class FixtureRouter(object):

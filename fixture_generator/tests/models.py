@@ -9,3 +9,6 @@ class Author(models.Model):
 class Book(models.Model):
     title = models.CharField(max_length=100)
     author = models.ForeignKey(Author)
+
+class Edition(models.Model):
+    book = models.ForeignKey(Book)

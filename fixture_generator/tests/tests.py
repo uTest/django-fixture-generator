@@ -37,12 +37,28 @@ def test_func_6():
 def test_func_7():
     pass
 
+@fixture_generator('tests.Book', 'tests.Edition')
+def test_books_and_editions():
+    pass
+
+@fixture_generator('tests.Author', 'tests.Book')
+def test_books():
+    pass
+
+@fixture_generator('tests.Author')
+def test_authors():
+    pass
+
+@fixture_generator('tests.Book', 'tests.Edition', requires=['tests.test_books', 'tests.test_authors'])
+def test_editions():
+    pass
+
 class LinearizeRequirementsTests(TestCase):
     def setUp(self):
         self.available_fixtures = {}
         fixtures = [
             "test_func_1", "test_func_2", "test_func_3", "test_func_4",
-            "test_func_5", "test_func_6", "test_func_7",
+            "test_func_5", "test_func_6", "test_func_7", "test_books", "test_authors"
         ]
         for fixture in fixtures:
             self.available_fixtures[("tests", fixture)] = globals()[fixture]
@@ -53,7 +69,7 @@ class LinearizeRequirementsTests(TestCase):
     def test_basic(self):
         requirements, models = self.linearize_requirements(test_func_1)
         self.assertEqual(requirements, [test_func_1])
-        self.assertEqual(models, set())
+        self.assertEqual(models, [])
 
     def test_diamond(self):
         requirements, models = self.linearize_requirements(test_func_2)
@@ -66,6 +82,17 @@ class LinearizeRequirementsTests(TestCase):
         self.assertRaises(CircularDependencyError,
             linearize_requirements, self.available_fixtures, test_func_6
         )
+
+    def test_stable_ordering(self):
+        """
+        Check that list of models to be serialized preserves 
+        original order. 
+        """
+        requirements, models = self.linearize_requirements(test_books_and_editions)
+        self.assertEqual(models, ["tests.Book", "tests.Edition"])
+
+        requirements, models = self.linearize_requirements(test_editions)
+        self.assertEqual(models, ["tests.Author", "tests.Book", "tests.Edition"])
 
 
 class ManagementCommandTests(TestCase):
