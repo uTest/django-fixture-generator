@@ -90,7 +90,7 @@ class Command(BaseCommand):
         requirements, models = linearize_requirements(available_fixtures, fixture)
 
         settings.DATABASES[FIXTURE_DATABASE] = {
-            "ENGINE": "sqlite3",
+            "ENGINE": "django.db.backends.sqlite3",
             "NAME": ":memory:",
         }
         old_routers = router.routers
