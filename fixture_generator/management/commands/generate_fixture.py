@@ -9,7 +9,7 @@ from fixture_generator.signals import data_dumped
 from django.test.simple import DjangoTestSuiteRunner
 
 import contextlib
-from fixture_generator.base import get_availble_fixtures, calculate_requirements
+from fixture_generator.base import get_available_fixtures, calculate_requirements
 
 
 @contextlib.contextmanager
@@ -109,7 +109,7 @@ class Command(BaseCommand):
     args = "app_label.fixture"
 
     def handle(self, fixture, **options):
-        fixtures = get_availble_fixtures(settings.INSTALLED_APPS)
+        fixtures = get_available_fixtures(settings.INSTALLED_APPS)
         fixture = fixtures[tuple(fixture.rsplit(".", 1))]
         requirements, models = calculate_requirements(fixtures, fixture)
         runner = GeneratingSuiteRunner(requirements, models, options)

@@ -3,7 +3,7 @@ from django.utils.module_loading import module_has_submodule
 from collections import namedtuple
 
 
-class Fixture(namedtuple("Fixture", "app name export_name func")):
+class Fixture(namedtuple("Fixture", "app name export func")):
     __slots__ = ()
 
     def __hash__(self):
@@ -19,6 +19,10 @@ class Fixture(namedtuple("Fixture", "app name export_name func")):
     @property
     def requires(self):
         return self.func.requires
+
+    @property
+    def label(self):
+        return "%s.%s" % (self.app, self.name)
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
@@ -59,7 +63,7 @@ def calculate_requirements(available_fixtures, fixture, seen=None):
     return requirements, list(unique_seq(reversed(models)))
 
 
-def get_availble_fixtures(apps):
+def get_available_fixtures(apps):
     fixtures = {}
     for app in apps:
         try:
@@ -69,10 +73,10 @@ def get_availble_fixtures(apps):
                 raise
             continue
         for obj in fixture_gen.__dict__.values():
-            export = getattr(obj, "__fixture_gen__", None)
-            if export is not None:
-                fixture = Fixture(app.rsplit(".", 1)[-1], obj.__name__, export, obj)
-                fixtures[fixture] = fixture
+            if not getattr(obj, "__fixture_gen__", None):
+                continue
+            fixture = Fixture(app.rsplit(".", 1)[-1], obj.__name__, obj.export, obj)
+            fixtures[fixture] = fixture
     return fixtures
 
 def fixture_generator(*models, **kwargs):
@@ -80,11 +84,13 @@ def fixture_generator(*models, **kwargs):
     Define function as a fixture generator
     """
     requires = kwargs.pop("requires", [])
+    export = kwargs.pop("export", False)
     if kwargs:
         raise TypeError("fixture_generator got an unexpected keyword argument: %r", iter(kwargs).next())
     def decorator(func):
         func.models = models
         func.requires = requires
-        func.__fixture_gen__ = kwargs.get("export", True)
+        func.export = func.__name__ if export is True else export
+        func.__fixture_gen__ = True
         return func
     return decorator

@@ -1,5 +1,5 @@
 from __future__ import absolute_import
 
-__version__ = "0.3.0a1"
+__version__ = "0.3.0a2"
 
 from .base import fixture_generator
