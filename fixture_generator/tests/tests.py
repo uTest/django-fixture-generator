@@ -1,13 +1,10 @@
-import sys
-from StringIO import StringIO
-
-from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 
 from fixture_generator import fixture_generator
 from fixture_generator.management.commands.generate_fixture import (
     linearize_requirements, CircularDependencyError)
 
+from multiprocessing import Process, Pipe
 
 @fixture_generator()
 def test_func_1():
@@ -95,28 +92,55 @@ class LinearizeRequirementsTests(TestCase):
         self.assertEqual(models, ["tests.Author", "tests.Book", "tests.Edition"])
 
 
-class ManagementCommandTests(TestCase):
-    def generate_fixture(self, fixture, **options):
-        out = sys.stdout
-        sys.stdout = StringIO()
+class ManagementCommandTests(TransactionTestCase):
+
+    def generate_fixture(self, fixture, target=None, **options):
+        import runtests
+        out, sink = Pipe(duplex=False)
+        p = Process(target=target or runtests.generate_fixture, args=[sink, fixture, options], name="Generator-%s" % fixture)
+        p.start()
         try:
-            call_command("generate_fixture", fixture, **options)
-            output = sys.stdout.getvalue()
+            return out.recv()
         finally:
-            sys.stdout = out
-        return output
+            p.join()
+
+    def test_isolation(self):
+        from fixture_generator.tests.models import Author
+        self.generate_fixture("tests.test_1")
+        self.assertFalse(Author.objects.all())
 
     def test_basic(self):
-        output = self.generate_fixture("tests.test_1")
-        self.assertEqual(output, """[{"pk": 1, "model": "tests.author", "fields": {"name": "Tom Clancy"}}, {"pk": 2, "model": "tests.author", "fields": {"name": "Daniel Pinkwater"}}]""")
+        outputs = self.generate_fixture("tests.test_1")
+        self.assertEqual(outputs, [
+            ("fixture.default.json", """[{"pk": 1, "model": "tests.author", "fields": {"name": "Tom Clancy"}}, {"pk": 2, "model": "tests.author", "fields": {"name": "Daniel Pinkwater"}}]""")
+        ])
 
     def test_auth(self):
         # All that we're checking for is that it doesn't hang on this call,
         # which would happen if the auth post syncdb hook goes and prompts the
         # user to create an account.
         output = self.generate_fixture("tests.test_2")
-        self.assertEqual(output, "[]")
+        self.assertEqual(output, [('fixture.default.json', '[]')])
 
     def test_natural_keys(self):
         output = self.generate_fixture("tests.test_3", use_natural_keys=True)
-        self.assertEqual(output, """[{"pk": 1, "model": "tests.book", "fields": {"author": ["Issac Asimov"], "title": "Foundation"}}]""")
+        self.assertEqual(output, [
+            ("fixture.default.json", """[{"pk": 1, "model": "tests.book", "fields": {"author": ["Issac Asimov"], "title": "Foundation"}}]""")
+        ])
+
+    def test_post_signal(self):
+        def target(*args, **kwargs):
+            from fixture_generator.signals import data_dumped
+            def callback(sender, databases, **kwargs):
+                with open(sender.make_filename("unsupported"), "w+") as f:
+                    f.write("STAMP")
+            data_dumped.connect(callback)
+            import runtests
+            runtests.generate_fixture(*args, **kwargs)
+        output = self.generate_fixture("tests.test_2", target=target)
+        self.assertEqual(output, [
+            ('fixture.default.json', '[]'),
+            ("fixture.unsupported.json", """STAMP""")
+        ])
+
+
