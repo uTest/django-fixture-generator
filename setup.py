@@ -1,17 +1,15 @@
 import os
 
 from setuptools import setup, find_packages
-
-from fixture_generator import VERSION
-
+import fixture_generator
 
 f = open(os.path.join(os.path.dirname(__file__), 'README.txt'))
 readme = f.read()
 f.close()
 
 setup(
-    name='django-fixture-generator',
-    version=".".join(map(str, VERSION)),
+    name='djfixture',
+    version=fixture_generator.__version__,
     description='django-fixture-generator is a reusable django application to make writing fixtures not suck.',
     long_description=readme,
     author='Alex Gaynor',
