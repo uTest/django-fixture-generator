@@ -4,47 +4,13 @@ from optparse import make_option
 
 from django.core.management import BaseCommand, call_command
 from django.conf import settings
-from django.utils.importlib import import_module
-from django.utils.module_loading import module_has_submodule
+
 from fixture_generator.signals import data_dumped
 from django.test.simple import DjangoTestSuiteRunner
 
-
 import contextlib
+from fixture_generator.base import get_availble_fixtures, calculate_requirements
 
-
-class CircularDependencyError(Exception):
-    """
-    Raised when there is a circular dependency in fixture requirements.
-    """
-    pass
-
-def unique_seq(l):
-    seen = set()
-    for e in l:
-        if e not in seen:
-            seen.add(e)
-            yield e
-
-def linearize_requirements(available_fixtures, fixture, seen=None):
-    if seen is None:
-        seen = set([fixture])
-    models = list(reversed(fixture.models))
-    requirements = []
-    for requirement in fixture.requires:
-        app_label, fixture_name = requirement.rsplit(".", 1)
-        fixture_func = available_fixtures[(app_label, fixture_name)]
-        if fixture_func in seen:
-            raise CircularDependencyError
-        r, m = linearize_requirements(
-            available_fixtures,
-            fixture_func,
-            seen | set([fixture_func])
-        )
-        requirements.extend([req for req in r if req not in requirements])
-        models.extend(reversed(m))
-    requirements.append(fixture)
-    return requirements, list(unique_seq(reversed(models)))
 
 @contextlib.contextmanager
 def altered_stdout(f):
@@ -55,7 +21,7 @@ def altered_stdout(f):
 
 @contextlib.contextmanager
 def testing_environment():
-    from django.conf import settings
+    from django.core import management
     from django.core import mail
     from django.core.mail.backends import locmem
     from django.utils.translation import deactivate, activate, get_language
@@ -72,6 +38,9 @@ def testing_environment():
     debug, settings.DEBUG = settings.DEBUG, False
     settings.DEBUG = debug
 
+    # make sure south doesn't break stuff
+    management._commands['syncdb'] = 'django.core'
+
     yield
 
     activate(current_language)
@@ -82,7 +51,7 @@ def testing_environment():
 class GeneratingSuiteRunner(DjangoTestSuiteRunner):
 
     def __init__(self, requirements, models, options):
-        super(GeneratingSuiteRunner, self).__init__(verbosity=0)
+        super(GeneratingSuiteRunner, self).__init__(verbosity=1)
         self.requirements = requirements
         self.models = models
         self.options = options
@@ -140,19 +109,8 @@ class Command(BaseCommand):
     args = "app_label.fixture"
 
     def handle(self, fixture, **options):
-        available_fixtures = {}
-        for app in settings.INSTALLED_APPS:
-            try:
-                fixture_gen = import_module(".fixture_gen", app)
-            except ImportError:
-                if module_has_submodule(import_module(app), "fixture_gen"):
-                    raise
-                continue
-            for obj in fixture_gen.__dict__.values():
-                if getattr(obj, "__fixture_gen__", False):
-                    available_fixtures[(app.rsplit(".", 1)[-1], obj.__name__)] = obj
-        app_label, fixture_name = fixture.rsplit(".", 1)
-        fixture = available_fixtures[(app_label, fixture_name)]
-        requirements, models = linearize_requirements(available_fixtures, fixture)
+        fixtures = get_availble_fixtures(settings.INSTALLED_APPS)
+        fixture = fixtures[tuple(fixture.rsplit(".", 1))]
+        requirements, models = calculate_requirements(fixtures, fixture)
         runner = GeneratingSuiteRunner(requirements, models, options)
         runner.run_tests()

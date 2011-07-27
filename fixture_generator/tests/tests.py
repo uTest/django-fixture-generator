@@ -1,8 +1,8 @@
 from django.test import TestCase, TransactionTestCase
 
 from fixture_generator import fixture_generator
-from fixture_generator.management.commands.generate_fixture import (
-    linearize_requirements, CircularDependencyError)
+from fixture_generator.base import (
+    calculate_requirements, CircularDependencyError)
 
 from multiprocessing import Process, Pipe
 
@@ -60,16 +60,16 @@ class LinearizeRequirementsTests(TestCase):
         for fixture in fixtures:
             self.available_fixtures[("tests", fixture)] = globals()[fixture]
 
-    def linearize_requirements(self, test_func):
-        return linearize_requirements(self.available_fixtures, test_func)
+    def calculate_requirements(self, test_func):
+        return calculate_requirements(self.available_fixtures, test_func)
 
     def test_basic(self):
-        requirements, models = self.linearize_requirements(test_func_1)
+        requirements, models = self.calculate_requirements(test_func_1)
         self.assertEqual(requirements, [test_func_1])
         self.assertEqual(models, [])
 
     def test_diamond(self):
-        requirements, models = self.linearize_requirements(test_func_2)
+        requirements, models = self.calculate_requirements(test_func_2)
         self.assertEqual(
             requirements,
             [test_func_5, test_func_3, test_func_4, test_func_2]
@@ -77,7 +77,7 @@ class LinearizeRequirementsTests(TestCase):
 
     def test_circular(self):
         self.assertRaises(CircularDependencyError,
-            linearize_requirements, self.available_fixtures, test_func_6
+            calculate_requirements, self.available_fixtures, test_func_6
         )
 
     def test_stable_ordering(self):
@@ -85,10 +85,10 @@ class LinearizeRequirementsTests(TestCase):
         Check that list of models to be serialized preserves 
         original order. 
         """
-        requirements, models = self.linearize_requirements(test_books_and_editions)
+        requirements, models = self.calculate_requirements(test_books_and_editions)
         self.assertEqual(models, ["tests.Book", "tests.Edition"])
 
-        requirements, models = self.linearize_requirements(test_editions)
+        requirements, models = self.calculate_requirements(test_editions)
         self.assertEqual(models, ["tests.Author", "tests.Book", "tests.Edition"])
 
 
