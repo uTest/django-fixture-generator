@@ -7,10 +7,11 @@ from django.conf import settings
 
 from fixture_generator.signals import data_dumped
 from django.test.simple import DjangoTestSuiteRunner
+from django.test.utils import get_runner
+from django.utils import importlib
 
 import contextlib
 from fixture_generator.base import get_available_fixtures, calculate_requirements
-
 
 @contextlib.contextmanager
 def altered_stdout(f):
@@ -58,6 +59,8 @@ class GeneratingSuiteRunner(DjangoTestSuiteRunner):
 
     def run_tests(self, *args, **kwargs):
         with testing_environment():
+            # make sure global URLs are loaded here
+            importlib.import_module(settings.ROOT_URLCONF)
             old_config = self.setup_databases()
             try:
                 self.generate_fixtures()
@@ -74,8 +77,8 @@ class GeneratingSuiteRunner(DjangoTestSuiteRunner):
 
         self.dump_data(dbs)
 
-    def make_filename(self, dbname):
-        return os.path.join(self.options["dest_dir"], "%s.%s.%s" % (self.options["prefix"], dbname, self.options["format"]))
+    def make_filename(self, dbname, format=None):
+        return os.path.join(self.options["dest_dir"], "%s.%s.%s" % (self.options["prefix"], dbname, format or self.options["format"]))
 
     def dump_data(self, dbs):
         for db in dbs:
@@ -107,10 +110,16 @@ class Command(BaseCommand):
     )
 
     args = "app_label.fixture"
+    requires_model_validation = True
 
     def handle(self, fixture, **options):
         fixtures = get_available_fixtures(settings.INSTALLED_APPS)
         fixture = fixtures[tuple(fixture.rsplit(".", 1))]
         requirements, models = calculate_requirements(fixtures, fixture)
-        runner = GeneratingSuiteRunner(requirements, models, options)
+
+        # fetch the projects test runner class
+        runner_class = get_runner(settings)
+
+        FixtureRunner = type("FixtureRunner", (GeneratingSuiteRunner, runner_class), {})
+        runner = FixtureRunner(requirements, models, options)
         runner.run_tests()
