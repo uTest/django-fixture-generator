@@ -1,7 +1,6 @@
 import os
 
 from setuptools import setup, find_packages
-import fixture_generator
 
 f = open(os.path.join(os.path.dirname(__file__), 'README.txt'))
 readme = f.read()
@@ -9,7 +8,7 @@ f.close()
 
 setup(
     name='djfixture',
-    version=fixture_generator.__version__,
+    version="0.3.0a4",
     description='django-fixture-generator is a reusable django application to make writing fixtures not suck.',
     long_description=readme,
     author='Alex Gaynor',

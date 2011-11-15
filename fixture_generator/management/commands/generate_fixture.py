@@ -38,6 +38,7 @@ def testing_environment():
     deactivate()
     debug, settings.DEBUG = settings.DEBUG, False
     settings.DEBUG = debug
+    settings.CELERY_ALWAYS_EAGER = True
 
     # make sure south doesn't break stuff
     management._commands['syncdb'] = 'django.core'
