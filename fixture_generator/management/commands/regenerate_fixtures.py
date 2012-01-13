@@ -22,8 +22,10 @@ class Command(BaseCommand):
             help="Comma separeted list of databases to dump. All databases are used by default")
     )
 
-    def handle(self, *labels, **options):
-        fixtures = get_available_fixtures(settings.INSTALLED_APPS)
+    args = '<app app ... app>'
+
+    def handle(self, *apps, **options):
+        fixtures = get_available_fixtures(apps or settings.INSTALLED_APPS)
         for fixture in fixtures.itervalues():
             if not isinstance(fixture.export, basestring):
                 continue

@@ -1,5 +1,6 @@
 import os
 import sys
+import logging
 from optparse import make_option
 
 from django.core.management import BaseCommand, call_command
@@ -83,11 +84,15 @@ class GeneratingSuiteRunner(DjangoTestSuiteRunner):
 
     def dump_data(self, dbs):
         for db in dbs:
-            with open(self.make_filename(db), "w+") as f:
-                with altered_stdout(f):
-                    call_command("dumpdata",
-                         *["%s.%s" % (m._meta.app_label, m._meta.object_name) for m in self.models],
-                         **dict(self.options, verbosity=0, database=db))
+            file_name = self.make_filename(db)
+            try:
+                with open(file_name, "w+") as f:
+                    with altered_stdout(f):
+                        call_command("dumpdata",
+                             *["%s.%s" % (m._meta.app_label, m._meta.object_name) for m in self.models],
+                             **dict(self.options, verbosity=0, database=db))
+            except IOError, e:
+                logging.warning('Can not create fixture in "%s"' % file_name)  
 
         # post-dump hook
         data_dumped.send(self, models=self.models, databases=dbs)
