@@ -25,11 +25,7 @@ def altered_stdout(f):
 def testing_environment():
     from django.core import management
     from django.core import mail
-    from django.core.mail.backends import locmem
     from django.utils.translation import deactivate, activate, get_language
-
-    original_smtp = mail.SMTPConnection,
-    mail.SMTPConnection = locmem.EmailBackend
 
     original_email_backend = settings.EMAIL_BACKEND
     settings.EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
@@ -48,7 +44,6 @@ def testing_environment():
 
     activate(current_language)
     settings.EMAIL_BACKEND = original_email_backend
-    mail.SMTPConnection = original_smtp
 
 
 class GeneratingSuiteRunner(DjangoTestSuiteRunner):
@@ -92,7 +87,7 @@ class GeneratingSuiteRunner(DjangoTestSuiteRunner):
                              *["%s.%s" % (m._meta.app_label, m._meta.object_name) for m in self.models],
                              **dict(self.options, verbosity=0, database=db))
             except IOError, e:
-                logging.warning('Can not create fixture in "%s"' % file_name)  
+                logging.warning('Can not create fixture in "%s"' % file_name)
 
         # post-dump hook
         data_dumped.send(self, models=self.models, databases=dbs)

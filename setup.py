@@ -8,7 +8,7 @@ f.close()
 
 setup(
     name='djfixture',
-    version="0.3.0a5",
+    version="0.3.0a6",
     description='django-fixture-generator is a reusable django application to make writing fixtures not suck.',
     long_description=readme,
     author='Alex Gaynor',
