@@ -57,14 +57,29 @@ class GeneratingSuiteRunner(DjangoTestSuiteRunner):
 
     def run_tests(self, *args, **kwargs):
         with testing_environment():
-            # make sure global URLs are loaded here
-            importlib.import_module(settings.ROOT_URLCONF)
             old_config = self.setup_databases()
             try:
                 self.generate_fixtures()
             finally:
                 self.teardown_databases(old_config)
         return 0
+
+    def teardown_databases(self, old_config, **kwargs):
+        """
+        Destroys all the non-mirror databases.
+        """
+        old_names, mirrors = old_config
+        for connection, old_name, destroy in old_names:
+            if destroy:
+                connection.creation.destroy_test_db(old_name, self.verbosity)
+
+                ### Hack ###
+                # Django is leaving database name as test_dbname,
+                # later, next call to generate_fixtures from regenerate_fixtures
+                # takes this test_dbname and prepends test_ creating yet another db.
+                # this breaks in PG with Database Does Not Exist.
+                connection.settings_dict['NAME'] = old_name
+
 
     def generate_fixtures(self):
         dbs = filter(None, self.options["dbs"].split(',')) or settings.DATABASES.keys()
