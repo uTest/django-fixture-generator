@@ -3,6 +3,7 @@ import sys
 
 from os.path import dirname, abspath
 from django.conf import settings
+from django import setup
 
 if not settings.configured:
     settings.configure(
@@ -19,15 +20,15 @@ if not settings.configured:
         ]
     )
 
-from django.test.simple import DjangoTestSuiteRunner
-
+from django.test.runner import DiscoverRunner
 
 def runtests(*test_args):
     if not test_args:
-        test_args = ["tests"]
+        test_args = ["fixture_generator.tests"]
     parent = dirname(abspath(__file__))
     sys.path.insert(0, parent)
-    runner = DjangoTestSuiteRunner(verbosity=2, interactive=True, failfast=False)
+    setup()
+    runner = DiscoverRunner(verbosity=2, interactive=True, failfast=False)
     failures = runner.run_tests(test_args)
     sys.exit(failures)
 

@@ -1,15 +1,15 @@
 import os
 import sys
 import logging
+import importlib
 from optparse import make_option
 
 from django.core.management import BaseCommand, call_command
 from django.conf import settings
 
 from fixture_generator.signals import data_dumped
-from django.test.simple import DjangoTestSuiteRunner
+from django.test.runner import DiscoverRunner
 from django.test.utils import get_runner
-from django.utils import importlib
 
 import contextlib
 from fixture_generator.base import get_available_fixtures, calculate_requirements
@@ -38,16 +38,13 @@ def testing_environment():
     settings.CELERY_ALWAYS_EAGER = True
     settings.INDEXING_DISABLED = True
 
-    # make sure south doesn't break stuff
-    management._commands['syncdb'] = 'django.core'
-
     yield
 
     activate(current_language)
     settings.EMAIL_BACKEND = original_email_backend
 
 
-class GeneratingSuiteRunner(DjangoTestSuiteRunner):
+class GeneratingSuiteRunner(DiscoverRunner):
 
     def __init__(self, requirements, models, options):
         super(GeneratingSuiteRunner, self).__init__(verbosity=1)
@@ -68,8 +65,7 @@ class GeneratingSuiteRunner(DjangoTestSuiteRunner):
         """
         Destroys all the non-mirror databases.
         """
-        old_names, mirrors = old_config
-        for connection, old_name, destroy in old_names:
+        for connection, old_name, destroy in old_config:
             if destroy:
                 connection.creation.destroy_test_db(old_name, self.verbosity)
 
