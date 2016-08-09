@@ -1,6 +1,7 @@
-from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
 from collections import namedtuple
+from importlib import import_module
+
 
 
 class Fixture(namedtuple("Fixture", "app name export func")):
